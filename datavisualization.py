@@ -1,43 +1,34 @@
 from data_cleaning import data_cleaning
+from feature_engineering import feat_eng
+import pandas as pd
 import plotly.express as px
-from PIL import Image
-import plotly.figure_factory as ff
+import warnings
+warnings.filterwarnings("ignore")
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly.figure_factory as ff
+import plotly.io as pio
+import plotly.graph_objects as go
+import io
+from PIL import Image
 
+
+
+a = []
 def data_vis():
     data = data_cleaning()
     print(data)
 
-    categ = []
-    numer = []
-    
-    for col in data.columns:
-        if data.dtypes[col] == object:
-            categ.append(col)
-        else:
-            numer.append(col)
+    column=list(data.columns)
+    column_to_remove = ["interest_rate", "paid_late_fees", "emp_title"]
+    for col_to_remove in column_to_remove:
+        column.remove(col_to_remove)
+    # column.remove("interest_rate")
 
-    print("categorical--------------------",categ)
-    print("numerical---------------", numer)
+    print(column)
 
-    #remove outliers using IQR method
-    outliers_present = ['PAYMENTS', 'PURCHASES', 'PURCHASES_TRX', 'ONEOFF_PURCHASES', 'ONEOFF_PURCHASES_FREQUENCY', 'MINIMUM_PAYMENTS', 'INSTALLMENTS_PURCHASES', 'CREDIT_LIMIT', 'CASH_ADVANCE_FREQUENCY', 'CASH_ADVANCE_TRX', 'CASH_ADVANCE', 'BALANCE', 'BALANCE_FREQUENCY']
-    for value in outliers_present:
-        percentile25 = data[value].quantile(0.25)
-        percentile75 = data[value].quantile(0.75)
-        iqr = percentile75 - percentile25
-        upper_limit = percentile75 + 1.5 * iqr
-        lower_limit = percentile25 - 1.5 * iqr
-        data[value] = np.where(
-            data[value] > upper_limit,
-            upper_limit,
-            np.where(
-                data[value] < lower_limit,
-                lower_limit,
-                data[value]
-            ))
-
-    for i in numer:
+    for i in column:
         fig = px.histogram(data, y=i)
         fig.update_layout(template='plotly_dark')
         fig.update_xaxes(showgrid=False, zeroline=False)
@@ -46,18 +37,45 @@ def data_vis():
         fig.write_image(f"{i}_hist.jpg")
         # a.append(fig)
 
+    dataset = feat_eng()
+    
 
-    for i in numer:
-        fig = px.box(data, y=i)
+    #remove outliers using IQR method
+    columns_to_remove_outliers = ['installment', 'paid_total', 'paid_interest', 'annual_income']
+
+    for col in columns_to_remove_outliers:
+        q1 = dataset[col].quantile(0.25)
+        q3 = dataset[col].quantile(0.75)
+        iqr = q3 - q1
+        upper_limit = q3 + (1.5 * iqr)
+        lower_limit = q1 - (1.5 * iqr)
+
+        # Apply the filtering conditions to the original DataFrame
+        dataset = dataset.loc[(dataset[col] < upper_limit) & (dataset[col] > lower_limit)]
+
+    # Remove unwanted columns
+    column_to_remove = ["interest_rate", "loan_purpose", "homeownership", "issue_month", "loan_status", "term", "paid_late_fees"]
+    dataset = dataset.drop(columns=column_to_remove)
+
+    cols = list(dataset.columns)
+    print(cols)
+
+
+    for i in cols:
+        fig = px.box(dataset, y=i)
         fig.update_layout(template='plotly_dark')
         #fig.update_layout(plot_bgcolor = "plotly_dark")
         fig.update_xaxes(showgrid=False,zeroline=False)
         fig.update_yaxes(showgrid=False,zeroline=False)
         # fig.show()
         fig.write_image(f"{i}.jpg")
+        # a.append(fig)
 
-    y=data.corr().columns.tolist()
-    z=data.corr().values.tolist()
+    
+    columns_to_remove = ["interest_rate"]
+    df=data.drop(columns=columns_to_remove,axis=1)
+    y=df.corr().columns.tolist()
+    z=df.corr().values.tolist()
     z_text = np.around(z, decimals=4) # Only show rounded value (full value on hover)
     fig = ff.create_annotated_heatmap(z,x=y,y=y,annotation_text=z_text,colorscale=px.colors.sequential.Cividis_r,showscale=True)
     fig.update_layout(template='plotly_dark')
@@ -65,4 +83,5 @@ def data_vis():
     fig.write_image("img.jpg")
 
     return data
+
 data_vis()
